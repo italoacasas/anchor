@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use dialoguer::Input;
 use once_cell::sync::Lazy;
 use reqwest::header::USER_AGENT;
 use semver::Version;
@@ -50,23 +49,10 @@ pub fn use_version(version: &Version) -> Result<()> {
     let installed_versions = read_installed_versions();
     // Make sure the requested version is installed
     if !installed_versions.contains(version) {
-        let input: String = Input::new()
-            .with_prompt(format!(
-                "anchor-cli {} is not installed, would you like to install it? (y/n)",
-                version
-            ))
-            .default("n".into())
-            .interact_text()?;
-        if matches!(input.as_str(), "y" | "yy" | "Y" | "yes" | "Yes") {
-            install_version(version)?;
-        } else {
-            println!(
-                "Version {} is not installed, staying on version {}.",
-                version,
-                current_version()?
-            );
-            return Ok(());
-        }
+        return Err(anyhow!("version {} is not yet installed. Run \"avm install {}\" to install \
+        it \
+         before using it.",
+            version, version));
     }
 
     let mut current_version_file = fs::File::create(current_version_file_path().as_path())?;
@@ -300,5 +286,13 @@ mod tests {
         // Should ignore this file because its not anchor- prefixed
         fs::File::create(AVM_HOME.join("bin").join("garbage").as_path()).unwrap();
         assert!(read_installed_versions() == expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "version 0.0.0 is not yet installed. Run \"avm install 0.0.0\" \
+    to install it before using it.")]
+    fn test_use_version_not_found() {
+        ensure_paths();
+        use_version(&Version::parse("0.0.0").unwrap()).unwrap();
     }
 }
